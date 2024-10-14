@@ -31,6 +31,17 @@ interface ChatResponse {
   message: string;
 }
 
+interface Block {
+  id: number;
+  content: string;
+  isEditing: boolean;
+}
+
+interface AddingBlock{
+  id: number;
+  content: string;
+}
+
 // Helper function to retrieve a string from an S3 object
 const streamToString = (stream: stream.Readable): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -61,6 +72,26 @@ const getChatFromS3 = async (chatID: string): Promise<ChatObject | null> => {
   }
 };
 
+const getCanvasFromS3 = async (chatID: string): Promise<Block[] | null> => {
+  try {
+    const command = new GetObjectCommand({
+      Bucket: Resource.GenesissAgentsBucket.name, // Your S3 bucket name
+      Key: "GENESISSCANVAS" + chatID, // The chatID is used as the key
+    });
+
+    const response = await s3Client.send(command);
+    if (response.Body instanceof stream.Readable) {
+      const data = await streamToString(response.Body);
+      return JSON.parse(data) as Block[];
+    } else {
+      throw new Error("Unexpected response body type from S3");
+    }
+  } catch (error) {
+    console.error("Error retrieving chat from S3:", error);
+    return null;
+  }
+};
+
 // Helper function to upload the updated chat object back to S3
 const uploadChatToS3 = async (chatID: string, updatedChat: ChatObject): Promise<void> => {
   try {
@@ -68,6 +99,21 @@ const uploadChatToS3 = async (chatID: string, updatedChat: ChatObject): Promise<
       Bucket: Resource.GenesissAgentsBucket.name, // Your S3 bucket name
       Key: chatID,
       Body: JSON.stringify(updatedChat),
+      ContentType: "application/json",
+    });
+    await s3Client.send(command);
+  } catch (error) {
+    console.error("Error uploading chat to S3:", error);
+    throw new Error("Error uploading chat to S3");
+  }
+};
+
+const uploadCanvasToS3 = async (chatID: string, canvas: Block[]): Promise<void> => {
+  try {
+    const command = new PutObjectCommand({
+      Bucket: Resource.GenesissAgentsBucket.name, // Your S3 bucket name
+      Key: "GENESISSCANVAS" + chatID,
+      Body: JSON.stringify(canvas),
       ContentType: "application/json",
     });
     await s3Client.send(command);
@@ -135,10 +181,12 @@ export async function POST(request: NextRequest) {
     // Parse the request body to get chatID, userMessage, files, and other data
     const formData = await request.formData();
     const chatID = formData.get('chatID') as string;
-    const userMessage = JSON.parse(formData.get('userMessage') as string) as Message;
+    let userMessage = JSON.parse(formData.get('userMessage') as string) as Message;
     const files = formData.getAll('files') as File[]; // Get all file inputs
     let brainID = chatID;
     const teamID = formData.get('teamID') as string | undefined;
+    const canvasContent = JSON.parse(formData.get('canvasContent') as string) as Block[] | [];
+    const isAddingToCanvas = JSON.parse(formData.get('isAddingToCanvas') as string) === 'true';
 
     const agents = formData.get('agents') as string | undefined;
 
@@ -149,6 +197,7 @@ export async function POST(request: NextRequest) {
     const agentoptions = ["internet", "codegen", "graphgen", "imagegen", "docucomp", "memstore", "memsearch", "simplechat"];
 
 
+    userMessage.message = "This is the user message: " + userMessage.message; + "\n\n" + "This is the Canvas. The canvas is a collaborative document. You either need to generate something to be added to the canvas, or generate a response to be shown to the user in the chatUI. this depends on the isAddingToCanvas boolean, which is " + isAddingToCanvas + "." + "If this is true, you are generating content to add to the canvas" + "The current canvas, for reference is:" + "\n\n" + JSON.stringify(canvasContent, null, 2);
 
     if (agents) {
       switch (agents) {
@@ -199,6 +248,29 @@ export async function POST(request: NextRequest) {
           const codeResponseMarkdown = "## Results from Code Agent:\n\n" + codeResponseString.join("\n\n");
           // create a new message object with the code response
 
+          let chatObject = await getChatFromS3(chatID);
+
+          
+          if (isAddingToCanvas){
+            const newCanvas = await updateCanvas(canvasContent, codeResponseMarkdown, userMessage.message);
+
+            if (!chatObject) {
+              chatObject = { messages: [userMessage] };
+            }   
+
+            // Step 4: Append the API response message to the chat object
+            chatObject.messages.push({
+              message: "Genesiss Added Content to Canvas",
+              author: "system", // Assume the response is from the system or AI
+            });
+
+            await uploadChatToS3(chatID, chatObject);
+
+            await uploadCanvasToS3(chatID, newCanvas);
+
+            return NextResponse.json({ message: "Message sent successfully" }, { status: 200 });
+          }
+
           const newMessage: Message = {
             message: codeResponseMarkdown,
             author: 'Code Agent',
@@ -206,7 +278,6 @@ export async function POST(request: NextRequest) {
           // add the response to the messages array (chatObject)
 
           // Step 1: Retrieve the existing chat object from S3
-          let chatObject = await getChatFromS3(chatID);
 
           if (!chatObject) {
             chatObject = { messages: [userMessage] };
@@ -265,6 +336,26 @@ export async function POST(request: NextRequest) {
             // Step 1: Retrieve the existing chat object from S3
             let chatObject = await getChatFromS3(chatID);
 
+            if (isAddingToCanvas){
+              const newCanvas = await updateCanvas(canvasContent, graphMarkdown, userMessage.message);
+
+              if (!chatObject) {
+                chatObject = { messages: [userMessage] };
+              }
+
+              // Step 4: Append the API response message to the chat object
+              chatObject.messages.push({
+                message: "Genesiss Added Content to Canvas",
+                author: "system", // Assume the response is from the system or AI
+              });
+
+              await uploadChatToS3(chatID, chatObject);
+
+              await uploadCanvasToS3(chatID, newCanvas);
+
+              return NextResponse.json({ message: "Message sent successfully" }, { status: 200 });
+            }
+
             if (!chatObject) {
               chatObject = { messages: [userMessage] };
             } else {
@@ -315,6 +406,26 @@ export async function POST(request: NextRequest) {
             // Step 1: Retrieve the existing chat object from S3
             let chatObject = await getChatFromS3(chatID);
 
+            if (isAddingToCanvas){
+              const newCanvas = await updateCanvas(canvasContent, imageMarkdown, userMessage.message);
+              
+              if (!chatObject) {
+                chatObject = { messages: [userMessage] };
+              }
+
+              // Step 4: Append the API response message to the chat object
+              chatObject.messages.push({
+                message: "Genesiss Added Content to Canvas",
+                author: "system", // Assume the response is from the system or AI
+              });
+
+              await uploadChatToS3(chatID, chatObject);
+
+              await uploadCanvasToS3(chatID, newCanvas);
+
+              return NextResponse.json({ message: "Message sent successfully" }, { status: 200 });
+            }
+
             if (!chatObject) {
               chatObject = { messages: [userMessage] };
             } else {
@@ -363,6 +474,27 @@ export async function POST(request: NextRequest) {
 
             // Step 1: Retrieve the existing chat object from S3
             let chatObject = await getChatFromS3(chatID);
+
+            if (isAddingToCanvas){
+              const newCanvas = await updateCanvas(canvasContent, documentMarkdown, userMessage.message);
+
+              if (!chatObject) {
+                chatObject = { messages: [userMessage] };
+              }
+
+              // Step 4: Append the API response message to the chat object
+              chatObject.messages.push({
+                message: "Genesiss Added Content to Canvas",
+                author: "system", // Assume the response is from the system or AI
+              });
+
+              await uploadChatToS3(chatID, chatObject);
+
+              await uploadCanvasToS3(chatID, newCanvas);
+
+              return NextResponse.json({ message: "Message sent successfully" }, { status: 200 });
+
+            }
 
             if (!chatObject) {
               chatObject = { messages: [userMessage] };
@@ -477,6 +609,29 @@ export async function POST(request: NextRequest) {
             // Step 1: Retrieve the existing chat object from S3
             let chatObject = await getChatFromS3(chatID);
 
+            if (isAddingToCanvas){
+
+              const newCanvas = await updateCanvas(canvasContent, resultsMarkdown, userMessage.message);
+
+              if (!chatObject) {
+                chatObject = { messages: [userMessage] };
+              }
+                // Step 2: Append the new message to the existing chat object
+                chatObject.messages.push(userMessage);
+                
+                chatObject.messages.push(newMessage);
+
+                // Step 3: Save the updated chat object to S3
+                await uploadChatToS3(chatID, chatObject);
+
+                // Step 3: Save the updated chat object to S3
+                await uploadCanvasToS3(chatID, newCanvas);
+
+                // return success
+                return NextResponse.json({ message: "Message sent successfully" }, { status: 200 });
+
+            }
+
             if (!chatObject) {
               chatObject = { messages: [userMessage] };
             } else {
@@ -522,6 +677,28 @@ export async function POST(request: NextRequest) {
 
           // Step 1: Retrieve the existing chat object from S3
           let chatObject = await getChatFromS3(chatID);
+
+          if (isAddingToCanvas){
+
+            const newCanvas = await updateCanvas(canvasContent, response, userMessage.message);
+
+            if (!chatObject) {
+              chatObject = { messages: [userMessage] };
+            }
+              // Step 2: Append the new message to the existing chat object
+              chatObject.messages.push(userMessage);
+              
+              chatObject.messages.push(newMessage);
+
+              // Step 3: Save the updated chat object to S3
+              await uploadChatToS3(chatID, chatObject);
+
+              // Step 3: Save the updated chat object to S3
+              await uploadCanvasToS3(chatID, newCanvas);
+
+              // return success
+              return NextResponse.json({ message: "Message sent successfully" }, { status: 200 });
+          }
 
           if (!chatObject) {
             chatObject = { messages: [userMessage] };
@@ -569,6 +746,25 @@ export async function POST(request: NextRequest) {
     // Step 3: Send the message to the external API along with the files (if any) and get the response
     const apiResponse = await sendMessageToChatAPI(userMessage.message, chatID, [brainID], base64Images, base64Documents);
 
+    if(isAddingToCanvas) {
+      const newCanvas = await updateCanvas(canvasContent, apiResponse.message, userMessage.message);
+
+      // Step 4: Append the API response message to the chat object
+      chatObject.messages.push({
+        message: "Genesiss Added Content to Canvas",
+        author: "system", // Assume the response is from the system or AI
+      });
+
+      await uploadCanvasToS3(chatID, newCanvas);
+
+      // Step 5: Store the updated chat object back in S3
+      await uploadChatToS3(chatID, chatObject);
+
+      // Step 6: Return a success response
+      return NextResponse.json({ message: "Message sent successfully" }, { status: 200 });
+
+    }
+
     // Step 4: Append the API response message to the chat object
     chatObject.messages.push({
       message: apiResponse.message,
@@ -584,4 +780,210 @@ export async function POST(request: NextRequest) {
     console.error("Error processing chat update:", error);
     return NextResponse.json({ message: "Internal server error" }, { status: 500 });
   }
+}
+
+const addBlocksAtPositions = (contents: string[], positions: number[], blocks: Block[]): Block[] => {
+  if (contents.length !== positions.length) {
+    throw new Error("The number of contents and positions must match.");
+  }
+
+  const newBlocks = contents.map(content => ({
+    id: Date.now() + Math.random(), // Unique ID for each new block
+    content,
+    isEditing: false,
+  }));
+
+  // Sort positions and contents together based on positions
+  const sorted = positions
+    .map((position, index) => ({ position, newBlock: newBlocks[index] }))
+    .sort((a, b) => a.position - b.position);
+
+  // Insert each new block at its specified position
+  let offset = 0;
+  sorted.forEach(({ position, newBlock }) => {
+    blocks = [
+      ...blocks.slice(0, position + offset),
+      newBlock,
+      ...blocks.slice(position + offset),
+    ];
+    offset++; // Adjust offset to account for added blocks
+  });
+
+  return blocks;
+};
+
+
+const replaceBlocksAtPositions = (contents: string[], positions: number[], blocks: Block[]): Block[] => {
+  if (contents.length !== positions.length) {
+    throw new Error("The number of contents and positions must match.");
+  }
+
+  const newBlocksMap = new Map(
+    positions.map((position, index) => [
+      position,
+      { id: Date.now() + Math.random(), content: contents[index], isEditing: false },
+    ])
+  );
+
+  // Replace blocks at the specified positions
+  const updatedBlocks = blocks.map((block, index) =>
+    newBlocksMap.has(index) ? newBlocksMap.get(index)! : block
+  );
+
+  return updatedBlocks;
+};
+
+async function updateCanvas(originalCanvas: Block[], executionResult: string, userPrompt: string): Promise<Block[]> {
+  // ask LLM to generate function calls
+
+  interface ExpectedResponse{
+    addBlocks: {
+      contents: string[];
+      positions: number[];
+    },
+    replaceBlocks: {
+      contents: string[];
+      positions: number[];
+    }
+  }
+
+  const LLMPrompt = `Your job is to generate functioncalls for the following functions:
+
+  const addBlocksAtPositions = (contents: string[], positions: number[], blocks: Block[]): Block[] => {
+  if (contents.length !== positions.length) {
+    throw new Error("The number of contents and positions must match.");
+  }
+
+  const newBlocks = contents.map(content => ({
+    id: Date.now() + Math.random(), // Unique ID for each new block
+    content,
+    isEditing: false,
+  }));
+
+  // Sort positions and contents together based on positions
+  const sorted = positions
+    .map((position, index) => ({ position, newBlock: newBlocks[index] }))
+    .sort((a, b) => a.position - b.position);
+
+  // Insert each new block at its specified position
+  let offset = 0;
+  sorted.forEach(({ position, newBlock }) => {
+    blocks = [
+      ...blocks.slice(0, position + offset),
+      newBlock,
+      ...blocks.slice(position + offset),
+    ];
+    offset++; // Adjust offset to account for added blocks
+  });
+
+  return blocks;
+};
+
+
+const replaceBlocksAtPositions = (contents: string[], positions: number[], blocks: Block[]): Block[] => {
+  if (contents.length !== positions.length) {
+    throw new Error("The number of contents and positions must match.");
+  }
+
+  const newBlocksMap = new Map(
+    positions.map((position, index) => [
+      position,
+      { id: Date.now() + Math.random(), content: contents[index], isEditing: false },
+    ])
+  );
+
+  // Replace blocks at the specified positions
+  const updatedBlocks = blocks.map((block, index) =>
+    newBlocksMap.has(index) ? newBlocksMap.get(index)! : block
+  );
+
+  return updatedBlocks;
+};
+
+based on the user prompt, execution result, and canvas.
+
+The execution result:
+
+${executionResult}
+
+The user prompt and canvas:
+
+${userPrompt}
+
+your response MUST be in the following format, no more no less, because your response will be JSON parsed, so you must adhere to the format to prevent parsing failure
+
+interface ExpectedResponse{
+    addBlocks: {
+      contents: string[];
+      positions: number[];
+    },
+    replaceBlocks: {
+      contents: string[];
+      positions: number[];
+    }
+}
+
+You can use one or both of these functions to replace or add blocks to the canvas. If you are only using one, provide a single function call. If you are using both, provide both functions call.
+
+Content should be in Markdown format. Code blocks should be wrapped in ~~~language and ~~~. You can also use katex in your markdown
+Images should be rendered as images are in markdown format.
+
+Also note that the addblocks must always be listed before replaceblocks, and these are the order the functions are called.
+
+For example, if you only want to add blocks, you would provide the following JSON:
+
+{
+  "addBlocks": {
+    contents: ["THis is a content", "More content", etc],
+    positions: [0, 1, etc]
+  }
+}
+If you were using both functions, you would provide the following JSON:
+
+{
+  "addBlocks": {
+    contents: ["THis is a content", "More content", etc],
+    positions: [0, 1, etc]
+  },
+  "replaceBlocks": {
+    contents: ["THis is a content", "More content", etc],
+    positions: [0, 1, etc]
+  }
+}
+`
+
+  const simpleChatResponse = await fetch('https://genesiss.tech/api/schat', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      ak: Resource.GenesissAgentsAPIKey.value,
+      prompt: LLMPrompt
+    }),
+  })
+
+  if (!simpleChatResponse.ok) {
+    
+    throw new Error("Error sending message to chat API");
+  }
+
+  const { response } = await simpleChatResponse.json();
+
+  const { addBlocks, replaceBlocks } = JSON.parse(response) as ExpectedResponse;
+
+  let newCanvas = originalCanvas;
+
+  if (addBlocks) {
+     newCanvas = addBlocksAtPositions(addBlocks.contents, addBlocks.positions, originalCanvas);
+  }
+  
+  if (replaceBlocks) {
+    newCanvas = replaceBlocksAtPositions(replaceBlocks.contents, replaceBlocks.positions, newCanvas);
+  } else {
+    throw new Error("No blocks to add or replace");
+  }
+
+  return newCanvas;
+  
 }

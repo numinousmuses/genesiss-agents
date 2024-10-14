@@ -8,18 +8,8 @@ import remarkGfm from "remark-gfm";
 import rehypeKatex from "rehype-katex";
 import remarkMath from "remark-math";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { nightOwl } from "react-syntax-highlighter/dist/cjs/styles/prism";
+import { nord, nightOwl } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import { format } from "path";
-import EditorJS from "@editorjs/editorjs";
-import Header from "@editorjs/header";
-import List from "@editorjs/list";
-import CodeTool from "@editorjs/code";
-import InlineCode from "@editorjs/inline-code";
-import Marker from "@editorjs/marker";
-import Embed from "@editorjs/embed";
-import Table from "@editorjs/table";
-import LinkTool from "@editorjs/link";
-import ImageTool from "@editorjs/image";
 
 interface Message {
   message: string;
@@ -42,6 +32,11 @@ interface Chat {
 
 const agents = ["internet", "codegen", "graphgen", "imagegen", "docucomp", "memstore", "memsearch", "simplechat"];
 
+interface Block {
+  id: number;
+  content: string;
+  isEditing: boolean;
+}
 
 export default function Chat() {
   const [session, setSession] = useState<{
@@ -62,7 +57,47 @@ export default function Chat() {
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
   const [ isChatOpen, setIsChatOpen ] = useState(true);
   const [ isCanvasOpen, setIsCanvasOpen ] = useState(true);
-  const editorRef = useRef<EditorJS | null>(null); // EditorJS ref
+  const [markdownContent, setMarkdownContent] = useState("");
+  const [isAddingToCanvas, setIsAddingToCanvas] = useState(false); // New state for toggle
+
+
+  const [blocks, setBlocks] = useState<Block[]>([]);
+  const [currentContent, setCurrentContent] = useState<string>("");
+
+  const addBlock = (content: string) => {
+    setBlocks([
+      ...blocks,
+      { id: Date.now(), content, isEditing: false }
+    ]);
+    setCurrentContent(""); // Clear current input after adding block
+  };
+
+  const toggleEditBlock = (id: number) => {
+    setBlocks(blocks.map((block) =>
+      block.id === id ? { ...block, isEditing: !block.isEditing } : block
+    ));
+  };
+
+  const updateBlockContent = (id: number, newContent: string) => {
+    if (newContent.trim() === "") {
+      // Delete the block if content is empty
+      setBlocks(blocks.filter((block) => block.id !== id));
+    } else {
+      // Update block content otherwise
+      setBlocks(blocks.map((block) =>
+        block.id === id ? { ...block, content: newContent } : block
+      ));
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      if (currentContent.trim()) {
+        addBlock(currentContent);
+      }
+    }
+  };
 
   const router = useRouter();
   const params = useParams();
@@ -88,31 +123,6 @@ export default function Chat() {
       fetchSession(); // Fetch the session
     }
   }, [session, router]);
-
-  // Initialize Editor.js with error handling
-  useEffect(() => {
-    if (!editorRef.current) {
-      editorRef.current = new EditorJS({
-        holder: "editorjs",
-        tools: {
-          header: Header,
-          list: List,
-          code: CodeTool,
-          inlineCode: InlineCode,
-        },
-
-        placeholder: "Start typing your notes...",
-        minHeight: 0,
-      });
-    }
-
-    return () => {
-      if (editorRef.current && typeof editorRef.current.destroy === "function") {
-        editorRef.current.destroy();
-        editorRef.current = null;
-      }
-    };
-  }, []);
 
 
   // This effect runs after `session` is updated
@@ -146,6 +156,27 @@ export default function Chat() {
     }
   }, [session, chatID, router]);
 
+  useEffect(() => {
+    const resizeHandler = () => {
+      if (window.innerWidth < 1020) {
+        setIsCanvasOpen(false);
+        setIsChatOpen(true);
+      } else {
+        // setIsCanvasOpen(true); // Optionally, reopen the canvas if desired when the screen is resized back above 1020px
+      }
+    };
+  
+    // Initial check
+    resizeHandler();
+  
+    // Add resize event listener
+    window.addEventListener("resize", resizeHandler);
+  
+    // Clean up event listener on component unmount
+    return () => {
+      window.removeEventListener("resize", resizeHandler);
+    };
+  }, []);
 
   const fetchChatMessages = async () => {
     if (!session?.userId) return;
@@ -255,6 +286,10 @@ export default function Chat() {
     if (selectedAgent) formData.append("agent", selectedAgent);
 
     selectedFiles.forEach((file) => formData.append("files", file));
+
+    // Add the toggle value to formData
+    formData.append("isAddingToCanvas", JSON.stringify(isAddingToCanvas));
+    formData.append("canvasContent", JSON.stringify(blocks));
 
     try {
       const response = await fetch("/api/canvaschat/new", {
@@ -382,8 +417,9 @@ export default function Chat() {
         <div className={styles.pageTitle}>
           {chat ? chat.chatTitle : "Loading..."}
         </div>
-        <div className={styles.settings} onClick={openSettingsModal}>
-          Settings
+        <div className={styles.settings} >
+          <button className={styles.settingsButton} onClick={openSettingsModal}>Settings</button>
+          <button className={styles.switchToCanvasButton} onClick={() => {setIsChatOpen(false); setIsCanvasOpen(true)}}>Switch to Canvas</button>
         </div>
       </div>
 
@@ -409,7 +445,7 @@ export default function Chat() {
                         const match = /language-(\w+)/.exec(className || '');
                         return !inline && match ? (
                           <SyntaxHighlighter
-                            style={nightOwl}
+                            style={nord}
                             PreTag="div"
                             language={match[1]}
                             {...props}
@@ -445,8 +481,17 @@ export default function Chat() {
 
       {canSendMessage && (
         <div className={styles.pageFooter}>
-          
+          <div className={styles.toggleContainer}>
+            <button
+              onClick={() => setIsAddingToCanvas(!isAddingToCanvas)}
+              className={styles.toggleButton}
+            >
+              {isAddingToCanvas ? "Add to Canvas" : "Respond as Message"}
+            </button>
+          </div>
+
           <div className={styles.inputContainer}>
+            
             
             <input
               type="file"
@@ -468,6 +513,7 @@ export default function Chat() {
             />
             <button onClick={sendMessage} className={styles.sendButton}>Send</button>
           </div>
+          
 
           {isAgentMenuOpen && (
             <div className={styles.agentMenu}>
@@ -527,10 +573,76 @@ export default function Chat() {
      
     </div>}
      {isCanvasOpen && <div className={styles.canvas}>
-      <button className={styles.toggleButton} onClick={() => setIsChatOpen(!isChatOpen)}>Toggle Chat</button>
-      <button className={styles.switchButton} onClick={() => setIsCanvasOpen(!isCanvasOpen)}>Switch to Chat</button>
+      <div className={styles.canvasHeader}>
+        <button className={styles.toggleButton} onClick={() => setIsChatOpen(!isChatOpen)}>Toggle Chat</button>
+        <button className={styles.switchButton} onClick={() => {setIsCanvasOpen(!isCanvasOpen); setIsChatOpen(true)}}>Switch to Chat</button>
+      </div>
       <div className={styles.canvasContainer}>
-      <div id="editorjs" className={styles.editorContainer}></div>
+        <div className={styles.editorContainer}>
+          {blocks.map((block) =>
+            block.isEditing ? (
+              <textarea
+                key={block.id}
+                value={block.content}
+                onChange={(e) => updateBlockContent(block.id, e.target.value)}
+                onBlur={() => toggleEditBlock(block.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    toggleEditBlock(block.id);
+                  }
+                }}
+                rows={5}
+                className={styles.markdownTextarea}
+              />
+            ) : (
+              <div
+                key={block.id}
+                onDoubleClick={() => toggleEditBlock(block.id)}
+                className={styles.markdownBlock}
+              >
+                <ReactMarkdown
+                    remarkPlugins={[remarkGfm, remarkMath]}
+                    rehypePlugins={[rehypeKatex]}
+                    className={styles.markdown}
+                    components={{
+                      code({ node, inline, className, children, ...props }: any) {
+                        const match = /language-(\w+)/.exec(className || '');
+                        return !inline && match ? (
+                          <SyntaxHighlighter
+                            style={nord}
+                            PreTag="div"
+                            language={match[1]}
+                            {...props}
+                            className={styles.codeRender}
+                          >
+                            {String(children).replace(/\n$/, '')}
+                          </SyntaxHighlighter>
+                        ) : (
+                          <code className={className} {...props}>
+                            {children}
+                          </code>
+                        );
+                      },
+                    }}
+                  >
+                  {block.content}
+                </ReactMarkdown>
+              </div>
+            )
+          )}
+
+          {/* New textarea for adding content */}
+          <textarea
+            value={currentContent}
+            onChange={(e) => setCurrentContent(e.target.value)}
+            onKeyDown={handleKeyDown}
+            
+            placeholder="Type here, then press Enter to render. Shift+Enter for a new line."
+            rows={5}
+            className={styles.markdownTextarea}
+          />
+        </div>
       </div>
      </div>}
      </div>

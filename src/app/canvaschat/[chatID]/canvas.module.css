@@ -3,36 +3,53 @@
   justify-content: center;
 }
 
+.canvasHeader{
+  display: flex;
+  width: 100%;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
 .canvas {
   width: 50%;
   height: 100vh;
-  /* background-color: #1e1e1e; */
+  /* background-color: #1e1e1e;  */
   display: flex;
   flex-direction: column;
   align-items: center;
   padding: 10px;
-  border-left: #222222 0.5px solid;
-  border-right: #222222 0.5px solid;
-  background-color: white;
-  color: black;
+  border-left: #343434 0.5px solid;
+  border-right: #343434 0.5px solid;
 }
 
-/* For links */
-.custom-link {
-  color: #3498db; /* Customize link color */
-  text-decoration: underline;
+.markdownBlock{
+  padding: 20px;
+
 }
 
-/* For highlighted text */
-.custom-highlight {
-  background-color: yellow; /* Customize highlight color */
-  color: black;
-  padding: 0 2px;
+.markdownBlock li {
+  margin-left: 40px;
 }
 
 .canvasContainer {
-  height: 100%;
   width: 100%;
+  height: 100%;
+  overflow-y: scroll;
+  padding: 20px;
+}
+
+.editorContainer textarea {
+  width: 100%;
+  font-family: CreatoLight;
+  font-weight: bold;
+  border: none;
+  outline: none;
+  /* resize: none; */
+  /* background-color: transparent; */
+  color: white;
+  resize: vertical;
+  padding: 20px;
+  border-radius: 5px;
 }
 
 .page {
@@ -52,19 +69,23 @@
   padding-left: 10px;
   padding-right: 10px;
   height: 40px;
+
 }
 
-.backButton,
-.settings {
+.backButton, .settings,
+.settings button {
   color: rgb(135, 135, 135);
   transition: all 0.3s ease-in-out;
   background-color: rgb(0, 0, 0);
   padding: 5px;
   border-radius: 5px;
+  border: none;
+  outline: none;
+  cursor: pointer;
 }
 
 .backButton:hover,
-.settings:hover {
+.settings button:hover {
   color: rgb(0, 0, 0);
   background-color: rgb(215, 215, 215);
   cursor: pointer;
@@ -73,15 +94,17 @@
 .pageFooter {
   width: 100%;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   padding-left: 10px;
   padding-right: 10px;
   height: 40px;
+  margin-bottom: 10px;
 }
 
 .inputContainer {
-  width: 50%;
+  width: 60%;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -96,10 +119,27 @@
 
 .inputContainer input {
   width: 100%;
+  height: 50px;
   border: none;
   outline: none;
   background-color: transparent;
   color: white;
+}
+
+.toggleContainer button {
+  border: none;
+  outline: none;
+  background-color: rgb(149, 149, 149);
+  color: black;
+  transition: all 0.3s ease-in-out;
+  border-radius: 5px;
+  padding: 5px;
+  cursor: pointer;
+  margin-bottom: 10px;
+}
+
+.toggleContainer button:hover {
+  background-color: rgb(255, 255, 255);
 }
 
 .uploadButton {
@@ -223,17 +263,17 @@
 }
 
 .modal {
-  background: #2e2e2e; /* Dark background for modal */
+  background: #ffffff; /* Dark background for modal */
   padding: 20px;
   border-radius: 8px;
   width: 400px; /* Adjust width as needed */
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
   z-index: 1001;
-  color: white;
+  color: rgb(0, 0, 0);
 }
 
 .modal button {
-  background-color: #444444;
+  background-color: #000000;
   color: white;
 }
 
@@ -276,6 +316,20 @@
   }
 }
 
+@media screen and (max-width: 1020px) {
+  .toggleButton {
+    display: none;
+  }
+
+  .canvas{
+    width: 100%;
+  }
+
+  .page {
+    width: 100%;
+  }
+}
+
 .fileInputContainer {
   display: inline-block;
   position: relative;
@@ -315,6 +369,7 @@
 
 .noMessages {
   text-align: center;
+  color: rgb(161, 161, 161);
 }
 
 .permissionsTable {}
@@ -354,7 +409,7 @@
 }
 
 .modalContent button {
-  background-color: #444444;
+  background-color: #000000;
   color: white;
   border: none;
 }
@@ -374,7 +429,7 @@
 }
 
 .modalContent input {
-  background-color: #444444;
+  background-color: #000000;
   color: white;
   border: none;
   padding-left: 10px;
@@ -444,4 +499,24 @@
   bottom: 60px;
 }
 
+.canvasHeader button {
+  background-color: #000000;
+  color: #939393;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 300ms;
+}
 
+.canvasHeader button:hover {
+  transform: scale(0.95);
+  background-color: white;
+  color: black;
+}
+
+.toggleLabel{
+  width: 120px;
+  font-size: 10px;
+  display: flex;
+}
