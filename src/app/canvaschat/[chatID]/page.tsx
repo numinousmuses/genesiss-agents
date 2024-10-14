@@ -67,12 +67,13 @@ export default function Chat() {
   const [currentContent, setCurrentContent] = useState<string>("");
 
   const addBlock = (content: string) => {
-    setBlocks([
-      ...blocks,
-      { id: Date.now(), content, isEditing: false }
+    setBlocks((prevBlocks) => [
+      ...(Array.isArray(prevBlocks) ? prevBlocks : []),
+      { id: Date.now(), content, isEditing: false },
     ]);
     setCurrentContent(""); // Clear current input after adding block
   };
+  
 
   const toggleEditBlock = (id: number) => {
     setBlocks(blocks.map((block) =>
@@ -93,14 +94,40 @@ export default function Chat() {
 
   
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleKeyDown = async (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       if (currentContent.trim()) {
         addBlock(currentContent);
+
+        
+        
+        try {
+          const updatedBlocks = [
+            ...blocks,
+            { id: Date.now(), content: currentContent, isEditing: false }
+          ];
+          
+          const response = await fetch("/api/canvaschat/update", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ chatID, canvas: updatedBlocks }),
+          });
+  
+          if (!response.ok) throw new Error("Failed to update canvas on the server");
+  
+          console.log("Canvas updated successfully");
+
+          // fetchCanvas()
+
+          // console.log(blocks)
+        } catch (error) {
+          console.error("Error updating canvas:", error);
+        }
       }
     }
   };
+  
 
   const router = useRouter();
   const params = useParams();
@@ -116,6 +143,10 @@ export default function Chat() {
           body: JSON.stringify({ chatID, canvas: updatedBlocks }),
         });
         if (!response.ok) throw new Error("Failed to update canvas on the server");
+
+        if (!response.ok) console.log("Failed to update canvas on the server");
+
+        console.log("Canvas updated successfully");
       } catch (error) {
         console.error("Error updating canvas:", error);
       }
@@ -229,6 +260,25 @@ export default function Chat() {
   };
 
   // Function to fetch canvas data
+  // const fetchCanvas = async () => {
+  //   try {
+  //     const response = await fetch("/api/canvaschat/getcanvas", {
+  //       method: "POST",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify({ chatID }),
+  //     });
+
+  //     if (response.ok) {
+  //       const canvasData: Block[] = await response.json();
+  //       setBlocks(canvasData);
+  //     } else {
+  //       console.error("Failed to retrieve canvas");
+  //     }
+  //   } catch (error) {
+  //     console.error("Error fetching canvas:", error);
+  //   }
+  // };
+
   const fetchCanvas = async () => {
     try {
       const response = await fetch("/api/canvaschat/getcanvas", {
@@ -236,10 +286,20 @@ export default function Chat() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ chatID }),
       });
-
+  
       if (response.ok) {
-        const canvasData: Block[] = await response.json();
-        setBlocks(canvasData);
+        const canvasData = await response.json();
+        console.log("Canvas data:", canvasData); // Log the data
+  
+        if (Array.isArray(canvasData.canvas)) {
+          setBlocks(canvasData.canvas);
+          console.log("CANVAS state variable updated with new data:", canvasData.canvas);
+          console.log("New BLOCKS state variable:", blocks);
+
+        } else {
+          console.error("Canvas data is not an array:", canvasData);
+          setBlocks([]); // Default to an empty array
+        }
       } else {
         console.error("Failed to retrieve canvas");
       }
@@ -247,7 +307,7 @@ export default function Chat() {
       console.error("Error fetching canvas:", error);
     }
   };
-
+  
 
   useEffect(() => {
     if (session?.userId && !chat) {
@@ -455,7 +515,7 @@ export default function Chat() {
     <div className={styles.container}>
     {isChatOpen && <div className={styles.page}>
       <div className={styles.pageHeader}>
-        <div className={styles.backButton} onClick={() => router.push("/dashboard")}>
+        <div className={styles.backButton} onClick={() => router.push("/canvas")}>
           Back
         </div>
         <div className={styles.pageTitle}>
@@ -628,7 +688,7 @@ export default function Chat() {
       </div>
       <div className={styles.canvasContainer}>
         <div className={styles.editorContainer}>
-          {blocks.map((block) =>
+          {Array.isArray(blocks) && blocks.map((block) =>
             block.isEditing ? (
               <textarea
                 key={block.id}

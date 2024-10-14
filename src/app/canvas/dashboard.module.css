@@ -263,9 +263,10 @@
   
 .content {
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 20px;
+    /* gap: 10px; */
     margin-top: 20px;
     margin-bottom: 20px;
     flex-wrap: wrap; /* This allows the items to wrap to a new line */
@@ -344,25 +345,37 @@
 .chatBox {
   /* background-color: #303030; */
   /* background-color: #1a1a1a; */
-  background-color: #282828;
+  /* background-color: #282828; */
 
   color: rgb(255, 255, 255);
-  height: 100px;
-  width: 300px;
-  margin: 20px;
+  height: 50px;
+  width: 100%;
+  /* margin: 20px; */
   box-shadow: rgba(0, 0, 0, 0.3) 0px 19px 38px, rgba(0, 0, 0, 0.22) 0px 15px 12px;
-  border-radius: 10px;
+  /* border-radius: 10px; */
   transition: all 0.3s ease-in-out;
   cursor: pointer;
-  display: flex;
+  /* display: flex;
   flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  padding: 20px;
+  justify-content: space-between;
+  align-items: center; */
+  padding-top: 20px;
+  padding-bottom: 20px;
 }
 
-.chatBox:hover {
-  translate: 0 -10px;
+.chatcontainer{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  border-top: #4f4f4f 0.5px solid;
+  transition: all 0.3s ease-in-out;
+  padding-left: 20px;
+  padding-right: 20px;
+}
+
+.chatcontainer:hover {
+  scale: 0.99;
 }
 
 .createTeamSection .actionButton {

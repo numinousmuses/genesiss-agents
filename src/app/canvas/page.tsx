@@ -153,6 +153,7 @@ export default function Dashboard() {
   // Organize chats without team separation
   const organizedChats = () => {
     return chats.map((chat) => (
+      <div className={styles.chatcontainer} key={chat.chatID}>
       <div
         key={chat.chatID}
         className={styles.chatBox}
@@ -160,6 +161,8 @@ export default function Dashboard() {
       >
         {chat.chatTitle}
       </div>
+      <div className={styles.chatID}>{chat.chatID}</div>
+    </div>
     ));
   };
 
