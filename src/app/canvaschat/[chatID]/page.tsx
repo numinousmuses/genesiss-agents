@@ -1,6 +1,6 @@
 /*  eslint-disable */
 "use client";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import styles from "./canvas.module.css";
 import ReactMarkdown from "react-markdown";
@@ -10,6 +10,7 @@ import remarkMath from "remark-math";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { nord, nightOwl } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import { format } from "path";
+import debounce from "lodash.debounce";
 
 interface Message {
   message: string;
@@ -59,6 +60,7 @@ export default function Chat() {
   const [ isCanvasOpen, setIsCanvasOpen ] = useState(true);
   const [markdownContent, setMarkdownContent] = useState("");
   const [isAddingToCanvas, setIsAddingToCanvas] = useState(false); // New state for toggle
+  const [isCanvasLocked, setIsCanvasLocked] = useState(false); // New state for locking the canvas
 
 
   const [blocks, setBlocks] = useState<Block[]>([]);
@@ -78,17 +80,18 @@ export default function Chat() {
     ));
   };
 
+  // Update block content and trigger debounce update
   const updateBlockContent = (id: number, newContent: string) => {
-    if (newContent.trim() === "") {
-      // Delete the block if content is empty
-      setBlocks(blocks.filter((block) => block.id !== id));
-    } else {
-      // Update block content otherwise
-      setBlocks(blocks.map((block) =>
+    setBlocks((prevBlocks) => {
+      const updatedBlocks = prevBlocks.map((block) =>
         block.id === id ? { ...block, content: newContent } : block
-      ));
-    }
+      );
+      debouncedUpdateCanvas(updatedBlocks);
+      return updatedBlocks;
+    });
   };
+
+  
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -102,6 +105,25 @@ export default function Chat() {
   const router = useRouter();
   const params = useParams();
   const chatID = params?.chatID;
+
+  // Debounce function to update canvas on the server
+  const debouncedUpdateCanvas = useCallback(
+    debounce(async (updatedBlocks: Block[]) => {
+      try {
+        const response = await fetch("/api/canvaschat/update", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chatID, canvas: updatedBlocks }),
+        });
+        if (!response.ok) throw new Error("Failed to update canvas on the server");
+      } catch (error) {
+        console.error("Error updating canvas:", error);
+      }
+    }, 1000),
+    [chatID]
+  );
+
+
 
   useEffect(() => {
     const fetchSession = async () => {
@@ -206,9 +228,31 @@ export default function Chat() {
     }
   };
 
+  // Function to fetch canvas data
+  const fetchCanvas = async () => {
+    try {
+      const response = await fetch("/api/canvaschat/getcanvas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chatID }),
+      });
+
+      if (response.ok) {
+        const canvasData: Block[] = await response.json();
+        setBlocks(canvasData);
+      } else {
+        console.error("Failed to retrieve canvas");
+      }
+    } catch (error) {
+      console.error("Error fetching canvas:", error);
+    }
+  };
+
+
   useEffect(() => {
     if (session?.userId && !chat) {
       fetchChatMessages();
+      fetchCanvas(); // Fetch canvas data on page load
     }
   }, [chatID, session]);
 
@@ -291,21 +335,21 @@ export default function Chat() {
     formData.append("isAddingToCanvas", JSON.stringify(isAddingToCanvas));
     formData.append("canvasContent", JSON.stringify(blocks));
 
+    setIsCanvasLocked(true); // Lock canvas during update
+    
     try {
-      const response = await fetch("/api/canvaschat/new", {
-        method: "POST",
-        body: formData,
-      });
-
+      const response = await fetch("/api/canvaschat/new", { method: "POST", body: formData });
       if (response.ok) {
-        setNewMessage(""); // Clear the input field after sending the message
-        setSelectedFiles([]); // Clear file selection
-        fetchChatMessages(); // Fetch updated chat messages
+        setNewMessage("");
+        fetchChatMessages();
+        fetchCanvas(); // Refresh canvas after message sent
       } else {
         console.error("Failed to send message");
       }
     } catch (error) {
       console.error("Error sending message:", error);
+    } finally {
+      setIsCanvasLocked(false); // Unlock canvas after update
     }
   };
 
@@ -573,6 +617,11 @@ export default function Chat() {
      
     </div>}
      {isCanvasOpen && <div className={styles.canvas}>
+     {isCanvasLocked && (
+            <div className={styles.overlay}>
+              <p>Genesiss is updating canvas...</p>
+            </div>
+          )}
       <div className={styles.canvasHeader}>
         <button className={styles.toggleButton} onClick={() => setIsChatOpen(!isChatOpen)}>Toggle Chat</button>
         <button className={styles.switchButton} onClick={() => {setIsCanvasOpen(!isCanvasOpen); setIsChatOpen(true)}}>Switch to Chat</button>
@@ -638,7 +687,7 @@ export default function Chat() {
             onChange={(e) => setCurrentContent(e.target.value)}
             onKeyDown={handleKeyDown}
             
-            placeholder="Type here, then press Enter to render. Shift+Enter for a new line."
+            placeholder="Type markdown here, then press Enter to render. Shift+Enter for a new line."
             rows={5}
             className={styles.markdownTextarea}
           />
