@@ -1,0 +1,300 @@
+@font-face {
+  font-family: 'CreatoLight';
+  src: url('./fonts/CreatoDisplay-Thin.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: Anurati;
+  src: url("./fonts/Anurati-Regular.otf") format("opentype");
+}
+
+.page{
+  background-color: #000000;
+  color: #ffffff;
+  font-family: CreatoLight;
+}
+
+
+.heroPattern {
+  width: 100%;
+  height: 100%;
+  /* control ize */
+  --u: 5px;
+  --c1: #a4a4a4;
+  /* --c1: #00D8DA; */
+  --c2: #000000;
+  --c3: #1e1e1e;
+  --gp: 50% / calc(var(--u) * 16.9) calc(var(--u) * 12.8);
+  background: conic-gradient(
+        from 122deg at 50% 85.15%,
+        var(--c2) 0 58deg,
+        var(--c3) 0 116deg,
+        #fff0 0 100%
+      )
+      var(--gp),
+    conic-gradient(from 122deg at 50% 72.5%, var(--c1) 0 116deg, #fff0 0 100%)
+      var(--gp),
+    conic-gradient(from 58deg at 82.85% 50%, var(--c3) 0 64deg, #fff0 0 100%)
+      var(--gp),
+    conic-gradient(
+        from 58deg at 66.87% 50%,
+        var(--c1) 0 64deg,
+        var(--c2) 0 130deg,
+        #fff0 0 100%
+      )
+      var(--gp),
+    conic-gradient(from 238deg at 17.15% 50%, var(--c2) 0 64deg, #fff0 0 100%)
+      var(--gp),
+    conic-gradient(
+        from 172deg at 33.13% 50%,
+        var(--c3) 0 66deg,
+        var(--c1) 0 130deg,
+        #fff0 0 100%
+      )
+      var(--gp),
+    linear-gradient(98deg, var(--c3) 0 15%, #fff0 calc(15% + 1px) 100%)
+      var(--gp),
+    linear-gradient(-98deg, var(--c2) 0 15%, #fff0 calc(15% + 1px) 100%)
+      var(--gp),
+    conic-gradient(
+        from -58deg at 50.25% 14.85%,
+        var(--c3) 0 58deg,
+        var(--c2) 0 116deg,
+        #fff0 0 100%
+      )
+      var(--gp),
+    conic-gradient(from -58deg at 50% 28.125%, var(--c1) 0 116deg, #fff0 0 100%)
+      var(--gp),
+    linear-gradient(90deg, var(--c2) 0 50%, var(--c3) 0 100%) var(--gp);
+  overflow: hidden;
+}
+
+.hero {
+  position: relative;
+  width: 100%;
+  height: 500px; /* Adjust height as needed */
+  overflow: hidden;
+}
+
+.heroImage {
+  width: 100vw;
+  height: 100%;
+  object-fit: cover; /* Adjusts image to fill the div */
+}
+
+.hero::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0) 50%, rgba(0, 0, 0, 1) 100%);
+  pointer-events: none; /* Ensures the gradient does not interfere with interactions */
+}
+
+.heroText {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white; /* Text color */
+  text-align: center;
+  background: rgba(0, 0, 0, 0.5); /* Optional: Adds a semi-transparent background to text */
+  padding: 10px; /* Optional: Adds padding around text */
+  border-radius: 5px; /* Optional: Rounds the corners of the text background */
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: 5rem; /* Adjust text size */
+}
+
+.hero p {
+  margin: 0;
+  font-size: 1rem; /* Adjust subtitle size */
+}
+
+.gCardText {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white; /* Text color */
+  font-size: 1.5rem;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.5); /* Optional: Adds a semi-transparent background to text */
+  padding: 10px; /* Optional: Adds padding around text */
+  border-radius: 5px; /* Optional: Rounds the corners of the text background */
+}
+
+.bottomCards {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 2rem;
+  margin-top: 1rem;
+  height: 50vh;
+  padding-left: 2rem;
+  padding-right: 2rem;
+  overflow: hidden;
+
+
+}
+
+.bottomCardsTitle {
+  text-align: center;
+  font-size: 2rem;
+  margin-bottom: 2rem;
+  margin-top: 2rem;
+}
+
+.agents, .genesiss, .bytesize {
+  position: relative; /* Ensure positioning context for text */
+  display: flex; /* Flexbox to align text */
+  align-items: center; /* Center vertically */
+  justify-content: center; /* Center horizontally */
+  width: 100%;
+  height: 100%;
+  overflow: hidden; /* Prevents content from spilling outside the element */
+  object-fit: cover; /* Ensures images or other content fit within the set dimensions */
+  border-radius: 5px;
+  object-fit: cover; /* Adjusts image to fill the div */
+
+}
+
+.agents a, .genesiss a, .bytesize a {
+  width: 100%;
+  height: 100%;
+}
+
+/* Apply hover scaling effect to each card */
+.agents:hover, .genesiss:hover, .bytesize:hover {
+  transform: scale(1.01);
+  transition: transform 400ms;
+  cursor: pointer;
+}
+
+/* Apply blur and scale down effect to non-hovered cards */
+.bottomCards:hover > .agents:not(:hover),
+.bottomCards:hover > .genesiss:not(:hover),
+.bottomCards:hover > .bytesize:not(:hover) {
+  filter: blur(10px);
+  transform: scale(0.99);
+  transition: transform 400ms, filter 400ms;
+}
+
+
+.agentsPattern{
+  width: 100%;
+  height: 100%;
+  --s: 84px;
+  --c1: #878787;
+  --c2: #3b3b3b;
+  --c3: #000000;
+
+  /* --c1: #ffffff;
+  --c2: #8c8c8c;
+  --c3: #000000; */
+
+  --_g: 0 120deg, #0000 0;
+  background: conic-gradient(
+      from 0deg at calc(500% / 6) calc(100% / 3),
+      var(--c3) var(--_g)
+    ),
+    conic-gradient(
+      from -120deg at calc(100% / 6) calc(100% / 3),
+      var(--c2) var(--_g)
+    ),
+    conic-gradient(
+      from 120deg at calc(100% / 3) calc(500% / 6),
+      var(--c1) var(--_g)
+    ),
+    conic-gradient(
+      from 120deg at calc(200% / 3) calc(500% / 6),
+      var(--c1) var(--_g)
+    ),
+    conic-gradient(
+      from -180deg at calc(100% / 3) 50%,
+      var(--c2) 60deg,
+      var(--c1) var(--_g)
+    ),
+    conic-gradient(
+      from 60deg at calc(200% / 3) 50%,
+      var(--c1) 60deg,
+      var(--c3) var(--_g)
+    ),
+    conic-gradient(
+      from -60deg at 50% calc(100% / 3),
+      var(--c1) 120deg,
+      var(--c2) 0 240deg,
+      var(--c3) 0
+    );
+  background-size: calc(var(--s) * 1.732) var(--s);
+}
+
+.genesissPattern {
+  width: 100%;
+  height: 100%;
+  --s: 150px; /* control the size */
+  --c1: #656565;
+  --c2: #000000;
+
+  --_g: var(--c1) 0% 5%, var(--c2) 6% 15%, var(--c1) 16% 25%, var(--c2) 26% 35%,
+    var(--c1) 36% 45%, var(--c2) 46% 55%, var(--c1) 56% 65%, var(--c2) 66% 75%,
+    var(--c1) 76% 85%, var(--c2) 86% 95%, #0000 96%;
+  background: radial-gradient(50% 50% at 100% 0, var(--_g)),
+    radial-gradient(50% 50% at 0 100%, var(--_g)),
+    radial-gradient(50% 50%, var(--_g)),
+    radial-gradient(50% 50%, var(--_g)) calc(var(--s) / 2) calc(var(--s) / 2)
+      var(--c1);
+  background-size: var(--s) var(--s);
+}
+
+.bytesizePattern {
+  width: 100%;
+  height: 100%;
+  --s: 82px;
+  /* --c1: #b2b2b2;
+  --c2: #ffffff;
+  --c3: #d9d9d9; */
+
+  --c1: #000000;
+  --c2: #505050;
+  --c3: #9e9e9e;
+
+  /* --c1: #000000;
+  --c2: #8c8c8c;
+  --c3: #ffffff; */
+  
+  --_g: var(--c3) 0 120deg, #0000 0;
+  background: conic-gradient(from -60deg at 50% calc(100% / 3), var(--_g)),
+    conic-gradient(from 120deg at 50% calc(200% / 3), var(--_g)),
+    conic-gradient(
+      from 60deg at calc(200% / 3),
+      var(--c3) 60deg,
+      var(--c2) 0 120deg,
+      #0000 0
+    ),
+    conic-gradient(from 180deg at calc(100% / 3), var(--c1) 60deg, var(--_g)),
+    linear-gradient(
+      90deg,
+      var(--c1) calc(100% / 6),
+      var(--c2) 0 50%,
+      var(--c1) 0 calc(500% / 6),
+      var(--c2) 0
+    );
+  background-size: calc(1.732 * var(--s)) var(--s);
+}
+
+.footer {
+  height: 50vh;
+}
+
+@media screen and (max-width: 600px) {
+  .hero {
+    height: 100vh;
+  }
+}

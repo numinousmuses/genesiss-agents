@@ -1,0 +1,440 @@
+@font-face {
+    font-family: 'CreatoLight';
+    src: url('./../fonts/CreatoDisplay-Thin.otf') format('opentype');
+    font-weight: normal;
+    font-style: normal;
+}
+  
+@font-face {
+    font-family: Anurati;
+    src: url("./../fonts/Anurati-Regular.otf") format("opentype");
+}
+
+.header{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 1rem;
+    margin-top: 10px;
+}
+
+
+.page {
+    color: white;
+    font-family: CreatoLight;
+    overflow-y: scroll;
+    scrollbar-color: #ffffff #000000;
+}
+
+.logoText, .session{
+    font-size: 1.2rem;
+}
+
+.session{
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    transition: all 500ms;
+}
+
+.page button {
+    background-color: rgb(255, 255, 255);
+    color: rgb(0, 0, 0);
+    transition: all 300ms;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 5px;
+    cursor: pointer;
+    width: 100px;
+    transition: all 300ms;
+}
+
+.settings button{
+  margin-left: 10px;
+  margin-bottom: 10px;
+  cursor: pointer;
+}
+
+.page button:hover {
+    scale: 0.95;
+}
+
+.logospan {
+    /* color: #00D8DA; */
+    color: #ff6347;
+
+}
+
+/* Modal styles */
+.modalOverlay, .chatModalOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.7); /* Dark semi-transparent background */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000; /* Ensure it appears above other content */
+    overflow-y: scroll;
+  }
+
+  .chatModalOverlay .actionButton{
+    margin: auto;
+  }
+  
+  .modal {
+    background: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    width: 400px; /* Adjust width as needed */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    z-index: 1001;
+    color: black;
+  }
+  
+  .modal button {
+    background-color: black;
+    color: white;
+  }
+
+  .modalContent button {
+    width: 150px;
+  }
+
+  .closeButton {
+    padding: 8px 12px;
+    border: none;
+    background: #007bff;
+    color: #fff;
+    border-radius: 4px;
+    transition: background 0.3s;
+  }
+  
+  .closeButton:hover {
+    background: #0056b3;
+  }
+
+  .modalContent {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 20px;
+    margin-bottom: 20px;
+  }
+  .modal input {
+    background-color: black;
+    color: white;
+    height: 33px;
+    padding: 5px;
+    border-radius: 5px;
+  }
+
+  .modalFooter {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .modalFooter button {
+    width: 150px;
+  }
+
+  .teamList {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .memberList{
+    text-align: center;
+    max-height: 100px;
+    overflow-y: auto;
+    scrollbar-color: #000000 #ffffff;
+    padding: 0;
+  }
+
+  
+  .teamItem {
+    padding: 10px;
+    margin: 5px 0;
+    background: #000000;
+    color: #fff;
+    cursor: pointer;
+    transition: background 0.3s;
+    border-radius: 5px;
+  }
+  
+  .teamItem:hover {
+    background: #303030;
+  }
+  
+  .teamActions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 20px;
+    margin-top: 20px;
+  }
+  
+  .input {
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    margin-right: 5px;
+  }
+  
+  .actionButton {
+    padding: 8px 12px;
+    border: none;
+    background: #007bff;
+    color: #fff;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.3s;
+  }
+  
+
+  .actionButton:hover {
+    background: #0056b3;
+  }
+
+  .deleteButton:hover {
+    background: #dc3545;
+  }
+
+  .deleteButton{
+    min-width: 93%;
+  }
+  
+
+.teamActions .actionButton{
+  width: 250px;
+}
+
+.actionInput {
+  display: flex;
+  justify-content: center;
+}
+
+.nothing{
+  width: 100%;
+  height: 100%;
+  --s: 194px; /* control the size */
+  --c1: #606060;
+  --c2: #353535;
+
+  --_l: #0000 calc(25% / 3), var(--c1) 0 25%, #0000 0;
+  --_g: conic-gradient(from 120deg at 50% 87.5%, var(--c1) 120deg, #0000 0);
+
+  background: var(--_g), var(--_g) 0 calc(var(--s) / 2),
+    conic-gradient(from 180deg at 75%, var(--c2) 60deg, #0000 0),
+    conic-gradient(from 60deg at 75% 75%, var(--c1) 0 60deg, #0000 0),
+    linear-gradient(150deg, var(--_l)) 0 calc(var(--s) / 2),
+    conic-gradient(
+      at 25% 25%,
+      #0000 50%,
+      var(--c2) 0 240deg,
+      var(--c1) 0 300deg,
+      var(--c2) 0
+    ),
+    linear-gradient(-150deg, var(--_l)) #000000 /* third color here */;
+  background-size: calc(0.866 * var(--s)) var(--s);
+}
+  @media screen and (max-width: 600px) {
+    .settings {
+      flex-direction: column;
+
+    }
+    .header{
+        padding: 0;
+        padding-left: 5px;
+        padding-right: 5px;
+        flex-direction: column;
+        gap: 0.7rem;
+    }
+  }
+  
+.content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    margin-top: 20px;
+    margin-bottom: 20px;
+    flex-wrap: wrap; /* This allows the items to wrap to a new line */
+}
+
+.teamBox {
+  background-color: rgb(179, 179, 179);
+  color: black;
+  display: flex;
+  flex-wrap: wrap;
+  max-width: 97%;
+  justify-content: center;
+  border-radius: 20px;
+}
+
+.teamBox{
+  width: 100%;
+  height: 100%;
+  --s: 194px; /* control the size */
+  --c1: #606060;
+  --c2: #353535;
+
+  --_l: #0000 calc(25% / 3), var(--c1) 0 25%, #0000 0;
+  --_g: conic-gradient(from 120deg at 50% 87.5%, var(--c1) 120deg, #0000 0);
+
+  background: var(--_g), var(--_g) 0 calc(var(--s) / 2),
+    conic-gradient(from 180deg at 75%, var(--c2) 60deg, #0000 0),
+    conic-gradient(from 60deg at 75% 75%, var(--c1) 0 60deg, #0000 0),
+    linear-gradient(150deg, var(--_l)) 0 calc(var(--s) / 2),
+    conic-gradient(
+      at 25% 25%,
+      #0000 50%,
+      var(--c2) 0 240deg,
+      var(--c1) 0 300deg,
+      var(--c2) 0
+    ),
+    linear-gradient(-150deg, var(--_l)) #000000 /* third color here */;
+  background-size: calc(0.866 * var(--s)) var(--s);
+}
+
+.nothing{
+  width: 100%;
+  height: 100%;
+  --s: 194px; /* control the size */
+  --c1: #606060;
+  --c2: #353535;
+
+  --_l: #0000 calc(25% / 3), var(--c1) 0 25%, #0000 0;
+  --_g: conic-gradient(from 120deg at 50% 87.5%, var(--c1) 120deg, #0000 0);
+
+  background: var(--_g), var(--_g) 0 calc(var(--s) / 2),
+    conic-gradient(from 180deg at 75%, var(--c2) 60deg, #0000 0),
+    conic-gradient(from 60deg at 75% 75%, var(--c1) 0 60deg, #0000 0),
+    linear-gradient(150deg, var(--_l)) 0 calc(var(--s) / 2),
+    conic-gradient(
+      at 25% 25%,
+      #0000 50%,
+      var(--c2) 0 240deg,
+      var(--c1) 0 300deg,
+      var(--c2) 0
+    ),
+    linear-gradient(-150deg, var(--_l)) #000000 /* third color here */;
+  background-size: calc(0.866 * var(--s)) var(--s);
+}
+
+.teamBox h3{
+  text-align: center;
+  background-color: none;
+  transform: rotate(-90deg); /* Rotates the text 90 degrees counterclockwise */
+  transform-origin: left top; /* Adjusts the origin of the rotation */
+  white-space: nowrap; /* Prevents text from wrapping to maintain a single line */
+  translate: 0 70px;
+  
+}
+
+.chatBox {
+  /* background-color: #303030; */
+  /* background-color: #1a1a1a; */
+  background-color: #282828;
+
+  color: rgb(255, 255, 255);
+  height: 100px;
+  width: 300px;
+  margin: 20px;
+  box-shadow: rgba(0, 0, 0, 0.3) 0px 19px 38px, rgba(0, 0, 0, 0.22) 0px 15px 12px;
+  border-radius: 10px;
+  transition: all 0.3s ease-in-out;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+}
+
+.chatBox:hover {
+  translate: 0 -10px;
+}
+
+.createTeamSection .actionButton {
+  width: 190px;
+  margin-bottom: 20px;
+}
+
+.createChatSection   {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 20px;
+    margin-bottom: 20px;
+  
+  
+}
+
+.permissionsTable{
+  width: 100%;
+
+}
+
+.permissionsSection{
+  max-height: 400px;
+  overflow-y: scroll;
+  scrollbar-color: #000000 #ffffff;
+}
+
+.permissionsTable tbody td{
+  text-align: center;
+}
+
+.noChats{
+  width: 100%;
+  height: 80vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+}
+
+.teamSubtitle{
+  font-size: 10px;;
+}
+
+.loadingContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  font-size: 4rem;
+  font-weight: bold;
+  color: rgb(255, 255, 255);
+}
+
+.letter {
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.fadeIn {
+  opacity: 1;
+}
+
+.fadeOut {
+  opacity: 0;
+}
+
+.agentsColor {
+  color: #ff6347;
+  /* color: #00D8DA; */
+}

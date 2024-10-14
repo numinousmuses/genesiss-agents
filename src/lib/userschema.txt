@@ -1,0 +1,124 @@
+userItem {
+    userID: string,
+    username: string,
+    hashedpassword: string,
+    email: string,
+    sk: string,
+    teams: {
+        teamID: string {
+            teamRole: string
+        },
+        teamID2: string {
+            teamRole: string
+        }
+    },
+    chats: {
+        chatID1: string {
+            chatTitle: string
+        },
+        chatID2: string {
+            chatTitle: string,
+            chatGroup?: string,
+            chatGroupID?: string
+
+        }
+    },
+    brains: {
+        brainID1: string {
+            brainName: string
+        }
+    }
+}
+
+team{
+    teamID: string,
+    teamTitle: string,
+    members: {
+        memberuserID: {
+            role: string
+        },
+        memberuserID2: {
+            role: string
+        }
+    },
+    sharedChats: {
+        chatID1: string {
+            chatTitle: string
+        },
+        chatID2: string {
+            chatTitle: string,
+            chatGroup?: string,
+            chatGroupID?: string
+        },
+        chatID3: string {
+            chatTitle: string,
+            permittedUsers: string,
+            hiddenUsers: string,
+        }
+    },
+}
+
+
+
+user {
+    userID: string,
+    username: string,
+    hashedPassword: string,
+    email: string,
+    sk: string,
+    teams: string[],
+    admin?: boolean
+}
+
+chat {
+    chatTitle: string,
+    chatID: string, // primary index, also the S3 key for the chat object
+    userID: string, // global secondary index, equals the teamID if team, otherwise is a user's ID
+    editors: string[], // if team and empty, whole team can access, if not empty, only editors and admins can edit
+    viewers: string[], // same principle as above
+    timestamp: string,
+    chatContent?: string, // the S3 url to the Messages[] array that is the chat history
+    chatGroup?: string,
+    chatGroupID?: string,
+    brainID?: string
+}
+
+team {
+    teamID: string, // hash key
+    teamName: string,
+    admins: string[],
+    members: string[], //excludes admins
+}
+
+interface Chat {
+    chatID: string,
+    chatTitle: string,
+    access: boolean, // true if user has edit access. user automatically has edit access for any chat objects where userID is the user's ID, for team chats (chats where userID is the teamID) only if the editors is blank or the user is in editors can this boolean be true
+    groupID?: string,
+    groupTitle?: string,
+    teamID?: string,
+    teamTitle?: string
+}
+
+interface Workflow {
+    title: string,
+    jobID: string,
+    userID: string,
+    description: string,
+    frequency: string,
+    createdAt: string,
+    outputs: string,
+}
+
+// retrieving chats for a user: 
+get user teams, 
+initialize array of Chat objects
+get chats using teams as userID index (to get team chats), 
+for chats where user is not in editors if editors is not blank, access = false
+get chats using user's ID as userID index
+access = true for all of these
+remove chats where user is not in viewers if viewers is not empty
+when retrieving chats, retrieve chats.messages by getting the text from S3 bucket (the key is the same as the chatID)
+return Chat[] array to frontend
+
+
