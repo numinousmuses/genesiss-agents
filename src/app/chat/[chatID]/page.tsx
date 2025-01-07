@@ -10,7 +10,10 @@ import remarkMath from "remark-math";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { nightOwl } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import { format } from "path";
-
+import * as webllm from "@mlc-ai/web-llm";
+import usePythonRunner from '@/lib/withPythonRunner';
+import { Chart } from 'react-chartjs-2';
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
 interface Message {
   message: string;
   author: string;
@@ -29,6 +32,9 @@ interface Chat {
   teamTitle?: string,
   messages?: Message[],
 }
+
+const modelId = "Llama-3.2-3B-Instruct-q4f32_1-MLC"
+// const codeModelId = "Qwen2.5-Coder-1.5B-Instruct-q4f16_1-MLC"
 
 // Function to check if a string is a UUID
 const isEmail = (member: string): boolean => {
@@ -62,10 +68,61 @@ export default function Chat() {
   const [isAgentMenuOpen, setIsAgentMenuOpen] = useState(false);
   const [filteredAgents, setFilteredAgents] = useState<string[]>([]);
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
+  const [codeEngine, setCodeEngine] = useState<webllm.MLCEngineInterface | null>(null);
+  const [llamaEngine, setLlamaEngine] = useState<webllm.MLCEngineInterface | null>(null);
+  const [statusMessage, setStatusMessage] = useState("");
+  const [pythonEngine, setPythonEngine] = useState<any>(null);
+  const [useAPI, setUseAPI] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const router = useRouter();
   const params = useParams();
   const chatID = params?.chatID;
+
+  // Define the LLM prompting logic
+  const promptLLMJSONSchema = async (schema: any, prompt: string, engine: webllm.MLCEngineInterface): Promise<any> => {
+      const schemaString = JSON.stringify(schema);
+      
+
+      const request: webllm.ChatCompletionRequest = {
+          stream: false,
+          messages: [
+              {
+                  role: "user",
+                  content: prompt,
+              },
+          ],
+          max_tokens: 8000,
+          response_format: {
+              type: "json_object",
+              schema: schemaString,
+          } as webllm.ResponseFormat,
+      };
+
+      try {
+          console.log("Message about to be sent to chat completion")
+          const completion = await engine.chatCompletion(request);
+          const output = completion.choices[0]?.message?.content;  // Access the generated content
+          console.log("Generated JSON Output:", output);
+          return output
+          // return JSON.parse(output!); // Parse the JSON response
+      } catch (error) {
+          console.error("Error generating JSON based on schema:", error);
+          try{
+              console.log("Trying to generate schema again")
+              const completion = await engine.chatCompletion(request);
+              const output = completion.choices[0]?.message?.content;  // Access the generated content
+              console.log("Generated JSON Output:", output);
+              return JSON.parse(output!); // Parse the JSON response
+          } catch {
+              console.log("Ultimate Fail")
+              return null
+          }
+      }
+  };
+
+  // load pyodide
+  const { pyodide } = usePythonRunner();
 
   useEffect(() => {
     const fetchSession = async () => {
@@ -74,6 +131,20 @@ export default function Chat() {
         if (response.ok) {
           const data = await response.json();
           setSession(data); // Set session here
+          const initProgressCallback = (report: webllm.InitProgressReport) => {
+              console.log("LLM Initialization:", report.text);
+          };
+    
+          const llamaengine: webllm.MLCEngineInterface = await webllm.CreateMLCEngine(modelId, { initProgressCallback });
+          setLlamaEngine(llamaengine);
+          // const codeengine: webllm.MLCEngineInterface = await webllm.CreateMLCEngine(codeModelId, { initProgressCallback });
+          // setCodeEngine(codeengine);
+
+          if (pyodide && !pythonEngine) {
+            setPythonEngine(pyodide);
+          }
+
+          
         } else {
           router.push("/login");
         }
@@ -86,7 +157,7 @@ export default function Chat() {
     if (!session) {
       fetchSession(); // Fetch the session
     }
-  }, [session, router]);
+  }, [session, router, pyodide, pythonEngine]);
 
 
   // This effect runs after `session` is updated
@@ -208,41 +279,495 @@ export default function Chat() {
     // }
   };
 
+  const handleInternetAgent = async () => {
+    try {
+        const data = await fetch("/api/chats/memory", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                userID: session?.userId,
+                chatID: chatID,
+            }),
+        });
+
+        const { context } = await data.json();
+        const LLMPrompt = `You are Genesiss AI. You are a helpful assistant with the ability to search the internet. Given the following context and user message, your job is to generate a list of internet queries to develop a source-based answer. Dependent should be true if you want to make further queries after your first queries are searched an analyzed. This is useful if later queries are dependent on the internet results of previous queries. User prompt: ${newMessage} \nContext: ${context}.\nThe chat messages:, latest to oldest:\n ${JSON.stringify(chat?.messages.reverse())}`;
+
+        const schema = {
+            type: "object",
+            properties: {
+                dependent: { type: "boolean" },
+                queries: { type: "array", items: { type: "string" } }
+            },
+            required: ["dependent", "queries"]
+        };
+
+        let generatedQueries = await promptLLMJSONSchema(schema, LLMPrompt, llamaEngine!);
+        generatedQueries = JSON.parse(generatedQueries);
+
+        setStatusMessage("Searching the internet...");
+
+        const scrapeResponse = await fetch("/api/internet", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                queries: generatedQueries.queries,
+            }),
+        });
+
+        const scrapeData: string[][] = await scrapeResponse.json();
+        setStatusMessage("Reading pages...");
+
+        let totalContext = "";
+
+        for (const contentArray of scrapeData) {
+            for (const pageContent of contentArray) {
+                const subqueryLLMPrompt = `You are Genesiss AI. You are a helpful assistant. You were given the prompt: ${newMessage}, and made the following internet search: ${generatedQueries.queries[1]}. Given the following context and user message, your job is to generate a source-based answer. Your source is: ${pageContent}. Format your response as a markdown paragraph, properly embedding urls and images.`;
+
+                const subquerySchema = {
+                    type: "object",
+                    properties: { response: { type: "string" } },
+                    required: ["response"]
+                };
+
+                let generatedAnswer = await promptLLMJSONSchema(subquerySchema, subqueryLLMPrompt, llamaEngine!);
+                generatedAnswer = JSON.parse(generatedAnswer);
+                const { response } = generatedAnswer;
+                totalContext += response + "\n";
+            }
+        }
+
+        if (generatedQueries.dependent) {
+            const regenPrompt = `You are Genesiss AI. You are a helpful assistant with the ability to search the internet. Given the following context and user message, your job is to generate a list of internet queries to develop a source-based answer. You previously generated queries: \n ${JSON.stringify(generatedQueries.queries)}.\nThese queries had responses: \n ${totalContext}\n User prompt: ${newMessage} \nContext: ${context}.\nThe chat messages:, latest to oldest:\n ${JSON.stringify(chat?.messages.reverse())}`;
+
+            const regenSchema = {
+                type: "object",
+                properties: { queries: { type: "array", items: { type: "string" } } },
+                required: ["queries"]
+            };
+
+            let generatedQueries2 = await promptLLMJSONSchema(regenSchema, regenPrompt, llamaEngine!);
+            generatedQueries2 = JSON.parse(generatedQueries2);
+
+            const scrapeResponse = await fetch("/api/internet", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    queries: generatedQueries2.queries,
+                }),
+            });
+
+            const scrapeData2: string[][] = await scrapeResponse.json();
+            setStatusMessage("Reading pages...");
+
+            let secondContext = "";
+
+            for (const contentArray of scrapeData2) {
+                for (const pageContent of contentArray) {
+                    const subqueryLLMPrompt = `You are Genesiss AI. You are a helpful assistant. You were given the prompt: ${newMessage}, and made the following internet search: ${generatedQueries2.queries[1]}. Given the following context and user message, your job is to generate a source-based answer. Your source is: ${pageContent}. Format your response as a markdown paragraph, properly embedding urls and images.`;
+
+                    const subquerySchema = {
+                        type: "object",
+                        properties: { response: { type: "string" } },
+                        required: ["response"]
+                    };
+
+                    const generatedAnswer = await promptLLMJSONSchema(subquerySchema, subqueryLLMPrompt, llamaEngine!);
+                    const { response } = JSON.parse(generatedAnswer);
+                    secondContext += response + "\n";
+                }
+            }
+
+            setStatusMessage("Conducting analysis...");
+
+            const finalLLMPrompt = `You are Genesiss AI. You are a helpful assistant. You were given the prompt: ${newMessage}, and made the following internet search: ${JSON.stringify(generatedQueries.queries)} \n ${JSON.stringify(generatedQueries2.queries)}. Given the following context and user message, your job is to generate a source-based answer. Format your response as a markdown paragraph, properly embedding urls and images. The internet search information is: ${secondContext} \n ${totalContext}.`;
+
+            const finalSchema = {
+                type: "object",
+                properties: { response: { type: "string" } },
+                required: ["response"]
+            };
+
+            const generatedAnswer = await promptLLMJSONSchema(finalSchema, finalLLMPrompt, llamaEngine!);
+            const { response } = JSON.parse(generatedAnswer);
+
+            await fetch("/api/chats/store", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    chatID: chatID,
+                    message: newMessage,
+                    response: response
+                }),
+            });
+
+            setNewMessage("");
+            fetchChatMessages();
+            return;
+        }
+
+        setStatusMessage("Conducting analysis...");
+        const finalllmprompt = `You are Genesiss AI. You are a helpful assistant. You were given the prompt: ${newMessage}, and made the following internet search: ${JSON.stringify(generatedQueries.queries)} \n The results from the internet search are: ${totalContext}. Given the internet context and user message, your job is to generate a source-based answer. Format your response as a markdown paragraph, properly embedding urls and images.`;
+
+        const finalSchema = {
+            type: "object",
+            properties: { response: { type: "string" } },
+            required: ["response"]
+        };
+
+        const generatedAnswer = await promptLLMJSONSchema(finalSchema, finalllmprompt, llamaEngine!);
+        const { response } = JSON.parse(generatedAnswer);
+
+        await fetch("/api/chats/store", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                chatID: chatID,
+                message: newMessage,
+                response: response
+            }),
+        });
+
+        setNewMessage("");
+        fetchChatMessages();
+        return;
+    } catch (error) {
+        alert("Failed to send message");
+    }
+};
+
+
+  const handleCodeAgent = async () => {
+    try {
+      // get relevant context from /api/chats/memory
+      const data = await fetch("/api/chats/memory", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userID: session?.userId,
+          chatID: chatID,
+        }),
+      })
+
+      const { context } = await data.json();
+      // generate steps
+      const stepsPrompt = `You are Genesiss AI. Your is to generate and run code. Generate a steps where each step is code that is written and executed in pure python. The user's prompt is: ${newMessage}. The previous chats from newest to oldest ${JSON.stringify(chat?.messages.reverse())}`
+
+      const stepsSchema = {
+        type: "object",
+        properties: {
+          steps: {
+            type: "array",
+            items: { type: "string" }
+          }
+        },
+        required: ["steps"]
+      }
+
+      const generatedAnswer = await promptLLMJSONSchema(stepsSchema, stepsPrompt, llamaEngine!)
+
+      const { steps } = JSON.parse(generatedAnswer);
+
+      // for each step, generate code
+
+      interface RanCode{
+        code: string,
+        output: string
+      }
+
+      let ranCode: RanCode[] = [];
+
+      for (let i = 0; i < steps.length; i++) {
+        const step = steps[i];
+        const codePrompt = `You are Genesiss AI. Your is to generate and run code. The user's prompt is: ${newMessage}. You generated the steps for code to run based on this: ${JSON.stringify(steps)}. The current step is: ${step}. Generate pure python code (no libraries other than the standard library) to complete this step. The previously ran code and output is ${JSON.stringify(ranCode)}`
+        const codeSchema = {
+          type: "object",
+          properties: {
+            code: {
+              type: "string"
+            },
+          },
+          required: ["code"]
+        }      
+        let generatedCode = await promptLLMJSONSchema(codeSchema, codePrompt, llamaEngine!)
+
+        generatedCode = JSON.parse(generatedCode)
+
+        if (pythonEngine) {
+          try {
+            let result = await pythonEngine.runPython(generatedCode.code);
+
+            ranCode.push({
+              code: generatedCode.code,
+              output: result
+            })
+          } catch (error) {
+            alert("Error running Python code:");
+          }
+
+        }
+
+      }
+
+      // concat everything into one string
+      const finalres = ranCode.map(ranCode => 
+          `## Generated code:\n~~~py\n${ranCode.code}\n~~~\n\n## Output\n${ranCode.output}\n`
+      ).join("\n");
+
+      // store in backend api/chats/store
+
+      // store in backend api/chats/store
+      const storeResponse = await fetch("/api/chats/store", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chatID: chatID,
+          message: newMessage,
+          response: finalres
+        }),
+      })
+
+      setNewMessage(""); // Clear the input field after sending the message
+      fetchChatMessages(); // Fetch updated chat messages
+      
+      return
+
+    } catch (error) {
+      alert("Failed to send message");
+    }
+  }
+
+
+  const handleGraphAgent = async () => {
+    try {
+      // use chat history as context
+      const llmPrompt =  `You are Genesiss AI. Your is to generate graphs. Generate a chartjs config object based on the user's prompt. The chart or graph will be 800 width and 600 height. The graph should be dark mode, with a dark background. The user's prompt is: ${newMessage}. The previous chats from newest to oldest ${JSON.stringify(chat?.messages.reverse())}`
+      // generate config object for graph
+      const chartJsConfigSchema = {
+        type: "object",
+        properties: {
+            type: { type: "string" }, // e.g., "bar", "line", "doughnut"
+            data: {
+                type: "object",
+                properties: {
+                    labels: {
+                        type: "array",
+                        items: {
+                            oneOf: [
+                                { type: "string" },
+                                { type: "number" },
+                                {
+                                    type: "array",
+                                    items: { type: "string" }
+                                }
+                            ]
+                        }
+                    },
+                    datasets: {
+                        type: "array",
+                        items: {
+                            type: "object",
+                            properties: {
+                                label: { type: "string" },
+                                data: {
+                                    oneOf: [
+                                        {
+                                            type: "array",
+                                            items: {
+                                                oneOf: [
+                                                    { type: "number" },
+                                                    { type: "object", properties: { x: { type: "number" }, y: { type: ["number", "null"] } }, required: ["x", "y"] },
+                                                    { type: "object", properties: { x: { type: "string" }, y: { type: ["number", "null"] } }, required: ["x", "y"] }
+                                                ]
+                                            }
+                                        },
+                                        {
+                                            type: "object",
+                                            additionalProperties: { type: "number" } // For { January: 10, February: 20 } format
+                                        }
+                                    ]
+                                },
+                                backgroundColor: {
+                                    type: "array",
+                                    items: { type: "string" }
+                                },
+                                borderColor: {
+                                    type: "array",
+                                    items: { type: "string" }
+                                },
+                                borderWidth: { type: "number" },
+                                hidden: { type: "boolean" }
+                            },
+                            required: ["data"]
+                        }
+                    }
+                },
+                required: ["datasets"]
+            },
+            options: {
+                type: "object",
+                properties: {
+                    responsive: { type: "boolean" },
+                    height: { type: "number" },
+                    width: { type: "number" },
+                    background: { type: "string" },
+                    colors: {
+                        type: "array",
+                        items: { type: "string" }
+                    },
+                    parsing: {
+                        oneOf: [
+                            { type: "boolean" },
+                            {
+                                type: "object",
+                                properties: {
+                                    key: { type: "string" },
+                                    xAxisKey: { type: "string" },
+                                    yAxisKey: { type: "string" }
+                                },
+                                additionalProperties: true
+                            }
+                        ]
+                    },
+                    scales: {
+                        type: "object",
+                        additionalProperties: { type: "object" }
+                    },
+                    plugins: {
+                        type: "object",
+                        additionalProperties: true
+                    }
+                },
+                additionalProperties: true
+            }
+        },
+        required: ["type", "data"],
+        additionalProperties: true
+      };
+
+      const graphConfigObj = await promptLLMJSONSchema(chartJsConfigSchema, llmPrompt, llamaEngine!)
+    
+      // store in backend api/chats/store
+      const storeResponse = await fetch("/api/chats/store", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chatID: chatID,
+          message: newMessage,
+          response: graphConfigObj,
+          graphgen: true,
+        }),
+      })
+
+      setNewMessage(""); // Clear the input field after sending the message
+      fetchChatMessages(); // Fetch updated chat messages
+      
+      return
+
+    } catch (error) {
+      
+    }
+  }
+
+
+  const handleSimpleAgent = async () => {
+    try {
+      // rag for context from /api/chats/memory
+      const data = await fetch("/api/chats/memory", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userID: session?.userId,
+          chatID: chatID,
+        }),
+      })
+
+      const { context } = await data.json();
+
+      const LLMPrompt = `You are Genesiss AI. You are a helpful assistant. Your task is to generate a response to the user's prompt: ${newMessage} \nYou have the following Context: ${context}.\nThe chat messages:, latest to oldest:\n ${JSON.stringify(chat?.messages.reverse())}`
+
+      const resSchema = {
+        type: "object",
+        properties: {
+          response: { type: "string" },
+        },
+        required: ["response"],
+      }
+      // generate simple answer
+
+      const response = await promptLLMJSONSchema(resSchema, LLMPrompt, llamaEngine!)
+      // store in backend api/chats/store
+      const resString = JSON.parse(response).response
+
+      // store in backend api/chats/store
+      const storeResponse = await fetch("/api/chats/store", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chatID: chatID,
+          message: newMessage,
+          response: resString
+        }),
+      })
+
+      setNewMessage(""); // Clear the input field after sending the message
+      fetchChatMessages(); // Fetch updated chat messages
+      
+      return
+    } catch (error) {
+      alert("Failed to send message");
+    }
+  }
+
+
+
   const sendMessage = async () => {
     if (!newMessage.trim()) return;
 
-    const validFiles = validateFiles(selectedFiles);
-    if (!validFiles) return;
 
-    const formData = new FormData();
-    formData.append("chatID", String(chatID || ""));
-    formData.append(
-      "userMessage",
-      JSON.stringify({
-        message: newMessage,
-        author: author,
-      })
-    );
-    if (selectedAgent) formData.append("agent", selectedAgent);
+      if (selectedFiles.length > 0 || useAPI) {
+        const validFiles = validateFiles(selectedFiles);
+        if (!validFiles) return;
 
-    selectedFiles.forEach((file) => formData.append("files", file));
+        const formData = new FormData();
+        formData.append("chatID", String(chatID || ""));
+        formData.append(
+          "userMessage",
+          JSON.stringify({
+            message: newMessage,
+            author: author,
+          })
+        );
+        if (selectedAgent) formData.append("agent", selectedAgent);
 
-    try {
-      const response = await fetch("/api/chats/new", {
-        method: "POST",
-        body: formData,
-      });
+        selectedFiles.forEach((file) => formData.append("files", file));
 
-      if (response.ok) {
-        setNewMessage(""); // Clear the input field after sending the message
-        setSelectedFiles([]); // Clear file selection
-        fetchChatMessages(); // Fetch updated chat messages
+        try {
+          const response = await fetch("/api/chats/new", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (response.ok) {
+            setNewMessage(""); // Clear the input field after sending the message
+            setSelectedFiles([]); // Clear file selection
+            fetchChatMessages(); // Fetch updated chat messages
+          } else {
+            console.error("Failed to send message");
+          }
+        } catch (error) {
+          console.error("Error sending message:", error);
+        }
+      } else if (selectedAgent === "internet") {
+        handleInternetAgent();
+      } else if (selectedAgent === "code") {
+        handleCodeAgent();
+      } else if (selectedAgent === "graph") {
+        handleGraphAgent();
       } else {
-        console.error("Failed to send message");
+        handleSimpleAgent();
       }
-    } catch (error) {
-      console.error("Error sending message:", error);
-    }
+      
   };
 
   const deleteChat = async () => {
@@ -369,7 +894,17 @@ export default function Chat() {
               >
                 {msg.author === "user" ? (
                   <span>{msg.message}</span>
-                ) : (
+                ) : msg.author === "graphgen" ? (
+                  // Chart.js graph rendering for "graphgen" messages
+                  (() => {
+                    try {
+                      const chartConfig = JSON.parse(msg.message); // Parse the Chart.js config JSON
+                      return <Chart {...chartConfig} />;
+                    } catch (error) {
+                      return <p className={styles.error}>Invalid chart configuration</p>;
+                    }
+                  })()
+                ) : ( // add custom graph rendering method
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm, remarkMath]}
                     rehypePlugins={[rehypeKatex]}

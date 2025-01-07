@@ -53,9 +53,9 @@ const client = new SESClient({
 export const sendVerificationEmail = async (email: string, userId: string, token: string, settings?:boolean) => {
   let verificationLink
   if(settings){
-     verificationLink = `https://search.genesiss.tech/api/settings/verify-email?userId=${userId}&token=${token}&email=${email}`;
+     verificationLink = `https://agents.genesiss.tech/api/settings/verify-email?userId=${userId}&token=${token}&email=${email}`;
   }else{
-     verificationLink = `https://search.genesiss.tech/api/auth/verify-email?userId=${userId}&token=${token}&email=${email}`;
+     verificationLink = `https://agents.genesiss.tech/api/auth/verify-email?userId=${userId}&token=${token}&email=${email}`;
   }
 
   const command = new SendEmailCommand({
@@ -69,7 +69,7 @@ export const sendVerificationEmail = async (email: string, userId: string, token
       },
       Body: {
         Html: {
-          Data: `<p>Thank you for signing up for Genesiss Search! Please verify your email by clicking the following link:</p><a href="${verificationLink}">${verificationLink}</a>`,
+          Data: `<p>Thank you for signing up for Genesiss Agents! Please verify your email by clicking the following link:</p><a href="${verificationLink}">${verificationLink}</a>`,
         },
         Text: {
           Data: `Please verify your email by clicking the following link: ${verificationLink}`,
@@ -89,7 +89,7 @@ export const sendVerificationEmail = async (email: string, userId: string, token
 
 
 export const sendPasswordResetEmail = async (email: string, userID: string, token: string) => {
-  const resetLink = `https://search.genesiss.tech/api/auth/reset-password?token=${token}&userId=${userID}&email=${email}`;
+  const resetLink = `https://agents.genesiss.tech/api/auth/reset-password?token=${token}&userId=${userID}&email=${email}`;
 
   const input = {
     Source: 'noreply@genesiss.tech', // Verified sender email

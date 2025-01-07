@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
 
     // Update chat title in DynamoDB
     const updateCommand = new UpdateCommand({
-      TableName: Resource.ChatsTable.name,
+      TableName: Resource.ChambersChatsTable.name,
       Key: { chatID },
       UpdateExpression: "SET chatTitle = :newTitle",
       ExpressionAttributeValues: {

@@ -21,6 +21,7 @@
     "@editorjs/list": "^1.10.0",
     "@editorjs/marker": "^1.4.0",
     "@editorjs/table": "^2.4.2",
+    "@mlc-ai/web-llm": "^0.2.73",
     "@nanostores/react": "github:ai/react",
     "@radix-ui/react-popover": "^1.1.2",
     "@radix-ui/react-scroll-area": "^1.2.0",
@@ -43,6 +44,7 @@
     "novel": "^0.4.3",
     "postprocessing": "^6.36.2",
     "react": "^18",
+    "react-chartjs-2": "^5.2.0",
     "react-dom": "^18",
     "react-markdown": "^9.0.1",
     "react-quill": "^2.0.0",
@@ -55,6 +57,7 @@
     "tailwind-merge": "^2.5.3",
     "tailwindcss": "^3.4.13",
     "use-debounce": "^10.0.4",
+    "usehooks-ts": "^3.1.0",
     "uuid": "^10.0.0"
   },
   "devDependencies": {

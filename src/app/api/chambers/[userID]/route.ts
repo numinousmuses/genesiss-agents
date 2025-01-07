@@ -66,7 +66,7 @@ async function streamToString(stream: any): Promise<string> {
 async function getChatsByUserID(userID: string): Promise<DatabaseChat[]> {
     try {
         const command = new QueryCommand({
-            TableName: Resource.ChatsTable.name, // Replace with your DynamoDB table name
+            TableName: Resource.ChambersChatsTable.name, // Replace with your DynamoDB table name
             IndexName: "CreatedAtIndex", // Replace with your GSI name
             KeyConditionExpression: 'userID = :userID',
             ExpressionAttributeValues: {

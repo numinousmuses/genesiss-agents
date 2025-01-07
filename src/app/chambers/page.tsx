@@ -1,6 +1,31 @@
 /* eslint-disable */
+
+// create chamber:
+// select number of agents
+// for each agent, provide a system prompt
+// initial prompt
+// no brainids
+// choose timer: 5s, 10s, 15s, 30s, 60s, 120s
+// choose first agent to respond out of the user-inputted agents
+// post to backend, redirect
+
+interface ChamberConfig {
+    userId: string;
+    chamberTitle: string;
+    initialPrompt: string;
+    agents: AgentConfig[];
+    timer: number;
+    firstAgent: string;
+    unlimited: boolean;
+}
+
+interface AgentConfig {
+    name: string;
+    systemPrompt: string;
+}
+
 "use client";
-import styles from "./dashboard.module.css";
+import styles from "./chambers.module.css";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -87,7 +112,7 @@ export default function Dashboard() {
 
       try {
         // Fetch chats for the user
-        const chatResponse = await fetch(`/api/chats/${session.userId}`);
+        const chatResponse = await fetch(`/api/chambers/${session.userId}`);
         if (chatResponse.ok) {
           const chatData: Chat[] = await chatResponse.json();
           setChats(chatData);
@@ -109,32 +134,6 @@ export default function Dashboard() {
       fetchChats();
     }
 
-    // Animation control
-    const animateLetters = () => {
-      if (animationPhase === "fadeIn") {
-        letters.forEach((_, i) => {
-          setTimeout(() => {
-            setVisibleLetters((prev) => [...prev, i]);
-            if (i === letters.length - 1) {
-              setTimeout(() => setAnimationPhase("fadeOut"), 500); // Delay before starting fade-out
-            }
-          }, i * 200); // 200ms delay between letters
-        });
-      } else if (animationPhase === "fadeOut") {
-        letters.slice().reverse().forEach((_, i) => {
-          setTimeout(() => {
-            setVisibleLetters((prev) => prev.slice(0, prev.length - 1));
-            if (i === letters.length - 1) {
-              // Add a delay after the last letter fades out before showing the dashboard
-              setTimeout(() => setLoading(false), 500); // Adjust delay as needed
-            }
-          }, i * 200); // 200ms delay between letters
-        });
-      }
-    };
-
-    animateLetters();
-
   }, [animationPhase, router, session, hasError]);
 
   const handleLogout = async () => {
@@ -153,15 +152,16 @@ export default function Dashboard() {
   // Organize chats without team separation
   const organizedChats = () => {
     return chats.map((chat) => (
+      <div className={styles.chatcontainer} key={chat.chatID}>
       <div
         key={chat.chatID}
         className={styles.chatBox}
-        onClick={() => router.push(`/chat/${chat.chatID}`)}
+        onClick={() => router.push(`/canvaschat/${chat.chatID}`)}
       >
-        <a href={`/chat/${chat.chatID}`}>{chat.chatTitle.length > 20
-          ? `${chat.chatTitle.substring(0, 20)}...`
-          : chat.chatTitle}</a>
+        {chat.chatTitle}
       </div>
+      <div className={styles.chatID}>{chat.chatID}</div>
+    </div>
     ));
   };
 
@@ -282,7 +282,7 @@ export default function Dashboard() {
         brainID: selectedBrainID === "createNew" ? newBrainID : selectedBrainID,
       };
 
-      const response = await fetch("/api/chats/create", {
+      const response = await fetch("/api/chambers/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(params),
@@ -290,7 +290,7 @@ export default function Dashboard() {
 
       if (response.ok) {
         const { chatID } = await response.json();
-        router.push(`/chat/${chatID}`);
+        router.push(`/chambers/${chatID}`);
         closeCreateChatModal();
       } else {
         alert("Failed to create chat");
@@ -313,7 +313,7 @@ export default function Dashboard() {
         brainID: selectedBrainID === "createNew" ? newBrainID : selectedBrainID,
       };
 
-      const response = await fetch("/api/canvaschat/create", {
+      const response = await fetch("/api/chambers/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(params),
@@ -321,7 +321,7 @@ export default function Dashboard() {
 
       if (response.ok) {
         const { chatID } = await response.json();
-        router.push(`/canvaschat/${chatID}`);
+        router.push(`/chambers/${chatID}`);
         closeCreateChatModal();
       } else {
         alert("Failed to create chat");
@@ -334,22 +334,6 @@ export default function Dashboard() {
   const openSettingsModal = () => setIsSettingsModalOpen(true); // Open Settings modal
   const closeSettingsModal = () => setIsSettingsModalOpen(false); // Close Settings modal
 
-  if (loading) {
-    return (
-      <div className={styles.loadingContainer}>
-        {letters.map((letter, index) => (
-          <span
-            key={index}
-            className={`${styles.letter} ${
-              visibleLetters.includes(index) ? styles.fadeIn : styles.fadeOut
-            } ${index >= 8 ? styles.agentsColor : ''}`} // Apply agentsColor class to indices 8 and above
-          >
-            {letter}
-          </span>
-        ))}
-      </div>
-    );
-  }
 
   return (
     <div className={styles.page}>
@@ -369,11 +353,8 @@ export default function Dashboard() {
           )}
         </div>
         <div className={styles.settings}>
-          <button onClick={openCreateChatModal} className={styles.createChatButton}>
-            New Chat
-          </button>
-          <button onClick={() => router.push('/canvas')}className={styles.createCanvasChatButton}>Canvas</button>
-          <button className={styles.logoutButton} onClick={() => router.push('/workflows')}>Workflows</button>
+          <button onClick={openCreateCanvasChatModal} className={styles.createCanvasChatButton}>Chamber</button>
+          <button className={styles.logoutButton} onClick={() => router.push('/dashboard')}>Dashboard</button>
           <button className={styles.settingsButton} onClick={openSettingsModal}>
             Settings
           </button>
@@ -384,8 +365,8 @@ export default function Dashboard() {
         {organizedChats()}
         {chats.length === 0 && 
           <div className={styles.noChats}>
-            <p>You have no chats yet. Create one now!</p>
-            <button onClick={openCreateChatModal} className={styles.createChatButton}>Create Chat</button>
+            <p>You have no chambers yet. Create one now!</p>
+            <button onClick={openCreateCanvasChatModal} className={styles.createChatButton}>Create Chamber</button>
           </div>
         }
       </div>
@@ -434,75 +415,13 @@ export default function Dashboard() {
         </div>
       )}
 
-      {isCreateChatModalOpen && (
-        <div className={styles.chatModalOverlay} onClick={closeCreateChatModal}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <h2>Create a New Chat</h2>
-            <div className={`${styles.createChatSection} ${styles.modalContent}`}>
-              <label>
-                Chat Title:
-                <input
-                  type="text"
-                  placeholder="Enter chat title"
-                  value={newChatTitle}
-                  onChange={(e) => setNewChatTitle(e.target.value)}
-                  className={styles.input}
-                />
-              </label>
-
-              <label>
-                Select Brain:
-                <select
-                  value={selectedBrainID}
-                  onChange={(e) => setSelectedBrainID(e.target.value)}
-                  className={styles.input}
-                >
-                  {brainIDs.length > 0 ? (
-                    brainIDs.map((brainID) => (
-                      <option key={brainID} value={brainID}>
-                        {brainID}
-                      </option>
-                    ))
-                  ) : (
-                    <option value="">No Custom Brain (Default)</option>
-                  )}
-                  <option value="createNew">Create New Brain ID</option>
-                </select>
-              </label>
-
-              {selectedBrainID === "createNew" && (
-                <label>
-                  New Brain ID:
-                  <input
-                    type="text"
-                    placeholder="Enter new brain ID"
-                    value={newBrainID}
-                    onChange={(e) => setNewBrainID(e.target.value)}
-                    className={styles.input}
-                  />
-                </label>
-              )}
-
-              <button onClick={createChat} className={styles.actionButton}>
-                Create Chat
-              </button>
-            </div>
-            <div className={styles.modalFooter}>
-              <button onClick={closeCreateChatModal} className={styles.closeButton}>
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {isCreateCanvasChatModalOpen && (
               <div className={styles.chatModalOverlay} onClick={closeCreateCanvasChatModal}>
                 <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-                  <h2>Create a New Canvas</h2>
+                  <h2>Create a New Chamber</h2>
                   <div className={`${styles.createChatSection} ${styles.modalContent}`}>
                     <label>
-                      Canvas Title:
+                      Chamber Title:
                       <input
                         type="text"
                         placeholder="Enter chat title"
@@ -546,7 +465,7 @@ export default function Dashboard() {
                     )}
 
                     <button onClick={createCanvasChat} className={styles.actionButton}>
-                      Create Chat
+                      Create Chamber
                     </button>
                   </div>
                   <div className={styles.modalFooter}>

@@ -17,7 +17,7 @@ export default function Home() {
         </div>
         
         <div className={styles.heroText}>
-            <h1>GENESISS <span className={styles.herospan}>SEARCH</span></h1>
+            <h1>GENESISS <span className={styles.herospan}>AGENTS</span></h1>
             <p>AI-powered knowledge discovery</p>
         </div>
       </div>

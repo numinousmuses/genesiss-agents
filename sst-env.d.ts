@@ -9,6 +9,10 @@ declare module "sst" {
       "name": string
       "type": "sst.aws.Dynamo"
     }
+    "ChambersChatsTable": {
+      "name": string
+      "type": "sst.aws.Dynamo"
+    }
     "ChatsTable": {
       "name": string
       "type": "sst.aws.Dynamo"

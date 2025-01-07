@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
 
     // Step 1: Delete the chat from the DynamoDB table
     const deleteCommand = new DeleteCommand({
-      TableName: Resource.ChatsTable.name, // Replace with your actual table name
+      TableName: Resource.ChambersChatsTable.name, // Replace with your actual table name
       Key: {
         chatID: chatID,
       },
